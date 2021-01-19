@@ -1,0 +1,114 @@
+openapi: 3.0.0
+info:
+  title: Blinded Comparator
+  description: Blinded Comparator
+  version: 0.1.0
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+paths:
+  /compare:
+    post:
+      description: Evaluates an operator with its inputs and returns the result.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComparisonRequest"
+      responses:
+        200:
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonResult"
+components:
+  schemas:
+    ComparisonRequest:
+      description: TODO
+      type: object
+      properties:
+        op:
+          $ref: "#/components/schemas/Operator"
+        auth:
+          type: object
+          properties:
+            edv:
+              type: array
+              items:
+                $ref: "#/components/schemas/Authorization"
+            kms:
+              type: array
+              items:
+                $ref: "#/components/schemas/Authorization"
+    ComparisonResult:
+      description: TODO - "comparison" does not sound apt as a name
+      type: object
+      properties:
+        result:
+          type: boolean
+    Operator:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+    EqOp:
+      allOf:
+        - $ref: "#/components/schemas/Operator"
+        - type: object
+          required:
+            - args
+          properties:
+            args:
+              type: array
+              items:
+                $ref: "#/components/schemas/Query"
+              minItems: 2
+    Query:
+      type: object
+      required:
+        - id
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - doc
+            - ref
+    DocQuery:
+      allOf:
+        - $ref: "#/components/schemas/Query"
+        - type: object
+          required:
+            - vaultID
+            - docID
+          properties:
+            vaultID:
+              type: string
+            docID:
+              type: string
+            path:
+              type: string
+    RefQuery:
+      allOf:
+        - $ref: "#/components/schemas/Query"
+        - type: object
+          required:
+            - ref
+          properties:
+            ref:
+              type: string
+    Authorization:
+      type: object
+      properties:
+        queryID:
+          type: array
+          items:
+            type: string
+        baseURL:
+          type: string
+        zcap:
+          type: object

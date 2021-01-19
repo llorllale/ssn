@@ -1,0 +1,114 @@
+@startuml
+
+actor "Account Holder" as user
+
+box Client Domains #LightBlue
+  participant "DHS svc 1" as d1
+  participant "DHS svc 2" as d2
+  participant Adapter as adp
+end box
+
+box Common Hosted Services #LightRed
+  participant Gateway as gate
+  participant "Trustbloc DID" as dlt
+  participant "Confidential Storage Hub" as edx
+  participant EDV as edv
+  participant WebKMS as kms
+end box
+
+group prior one-time setup
+  loop for each service
+    gate -> gate : newOrgSecret()
+    gate --> d1 : (out of band) orgSecret
+    d1 -> adp : init(orgSecret)
+    adp -> adp : newSvcKeyPair()
+    adp -> gate : createDID(key=svcKey, serviceEndpoint=..., authz=HMACSHA256(orgSecret))
+    gate -> dlt : createDID(key=svcKey, serviceEndpoint=...)
+    dlt -> gate : svcDID
+    gate -> adp : svcDID
+    adp -> d1 : svcDID
+  end
+end
+
+loop for each user registration at DHS service
+  user -> d1 : Registration w/SSN
+  d1 -> adp : newVault()
+  adp -> adp : newVaultID()
+  adp -> adp : newVaultPrimaryKey()
+  adp -> kms : createKeystore(controller=vaultPrimaryKey, authz=HMACSHA256(orgSecret))
+  kms -> adp : keystoreID, userKMSZCAP
+  adp -> edv : createDataVault(controller=vaultPrimaryKey, authz=HMACSHA256(orgSecret))
+  edv -> adp : edvVaultID, userEDVZCAP
+  adp -> d1 : vaultID
+  d1 -> adp : store(vault=vaultID, data=SSN)
+  adp -> adp : newCEK()
+  adp -> adp : encrypt(CEK, SSN)
+  adp -> kms : newKey(authz=HTTPSIG(userKMSZCAP))
+  kms -> adp : keyID
+  adp -> kms : wrap(CEK, keyID, authz=HTTPSIG(userKMSZCAP))
+  kms -> adp : wrappedCEK
+  adp -> adp : newEDVDocID()
+  adp -> adp : newEDVEncryptedDoc(docID, encryptedSSN, wrappedCEK)
+  adp -> edv : store(encryptedDoc, authz=HTTPSIG(userEDVZCAP))
+  edv -> adp : OK
+  note left
+    by now svc has associated to the user account:
+    userID, primaryKey, keystoreID, vaultID, EDV docID,
+    edvZCAP, kmsZCAP
+  end note
+  adp -> d1 : vaultID, edvDocID
+end
+
+group user links DHS service accounts
+  user -> d1 : Click "Link 'With' Account"
+  d1 -> user : NASCAR display with DHS services
+  user -> d1 : click on DHS service 2
+  d1 -> d2 : svc1DID#key
+  note left: how is this call authenticated?
+  d2 -> d2 : new short-lived code
+  d2 -> d1 : code, "http://svc2.gov/acct/link"
+  d1 -> user : link http://svc2.gov/acct/link?code=abc123
+  user -> d1 : click on link
+  user --> d2 : (redirect) login
+  d2 -> adp : authorizeComparison(svc1DID#key, vaultID, edvDocID)
+  adp -> adp : hubEDVZCAP := newZCAP(parent=userEDVZCAP, invoker=hubPubDID, exp=60s)
+  adp -> adp : hubKMSZCAP := newZCAP(parent=userKMSZCAP, invoker=hubPubDID, exp=60s)
+  adp -> dlt : resolve(svc1DID, authz=HMACSHA256(orgSecret))
+  dlt -> adp : did:trustbloc:svc1
+  adp -> edx : newRef(authorize=did:trustbloc:svc1#key, QueryObject, hubEDVZCAP, hubKMSZCAP, authz=HMACSHA256(orgSecret))
+  edx -> adp : handle, challenge
+  adp -> d2 : handle, challenge
+  d1 -> d2 : (polling) done?
+  d2 -> d1 : handle, challenge
+  note left: avoid disclosure of EDV doc IDs
+  d1 -> adp : compare(handle, challenge, userID, auth=did:trustbloc:svc1#key)
+  adp -> adp : hubEDVZCAP := newZCAP(parent=userEDVZCAP, invoker=adapterPubDID, exp=60s)
+  adp -> adp : hubKMSZCAP := newZCAP(parent=userKMSZCAP, invoker=adapterPubDID, exp=60s)
+  adp -> adp : newSignedJWT(did:trustbloc:svc1#key, challenge)
+  adp -> edx : compare(operator, handle, QueryObject, hubEDVZCAP, hubKMSZCAP, authz=[HMACSHA256(svcSecret), signedJWT(challenge)])
+  edx -> edx : array := newArray()
+  loop for each query object
+    alt if query object is ref
+      edx -> dlt : resolve(did:trustbloc:svc2)
+      dlt -> edx : DID doc
+      edx -> edx : verify(signedJWT(challenge), did:trustbloc:svc2#key)
+      edx -> edx : lookup Query+Auth Objects by handle
+      edx -> edx : verify challenge matches the handle
+      edx -> edx : verify authorized DID URL key matches the handle
+    end
+    edx -> edv : readDoc(QueryObject, authz=HTTPSIG(hubEDVZCAP))
+    edv -> edx : encryptedDoc
+    edx -> kms : unwrap(wrappedCEK, authz=HTTPSIG(hubKMSZCAP))
+    kms -> edx : unwrappedCEK
+    edx -> edx : let result = decrypt(encryptedDoc, unwrappedCEK)
+    alt if query object has path
+      edx -> edx : result = select(jsonPath, decryptedDoc)
+    end
+    edx -> edx : append(array, result)
+  end
+  edx -> adp : eval(operator, array)
+  note left: boolean response
+  adp -> d1 : true or false
+end
+
+@enduml
