@@ -1,8 +1,8 @@
 openapi: 3.0.0
 info:
-  title: Vault Server
-  description: Vault Server
-  version: 0.1.0
+  title: Vault API
+  description: Vault API
+  version: 1.0.0
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -10,19 +10,18 @@ paths:
   /vaults:
     post:
       description: Creates a new vault.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/Vault"
       responses:
         201:
           description: Vault created successfully.
+          headers:
+            Location:
+              description: Location of the vault
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Location"
+                $ref: "#/components/schemas/Vault"
   /vaults/{vaultID}/docs:
     post:
       description: Encrypts and stores the document in the vault.
@@ -35,10 +34,15 @@ paths:
       responses:
         201:
           description: Document encrypted and stored successfully.
+          headers:
+            Location:
+              description: Location of the document
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Location"
+                $ref: "#/components/schemas/Document"
   /vaults/{vaultID}/docs/{docID}:
     get:
       description: The plaintext document.
@@ -61,10 +65,15 @@ paths:
       responses:
         201:
           description: Authorization created.
+          headers:
+            Location:
+              description: Location of the authorization
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Location"
+                $ref: "#/components/schemas/Authorization"
   /vaults/{vaultID}/authorizations/{authorizationID}:
     get:
       description: Fetch an authorization.
@@ -82,12 +91,6 @@ paths:
           description: Authorization deleted.
 components:
   schemas:
-    Location:
-      type: object
-      properties:
-        url:
-          description: URL of the resource.
-          type: string
     Vault:
       type: object
       required:
@@ -96,15 +99,21 @@ components:
           type: string
           description: Unique identifier for the vault.
         edv:
-          type: string
-          description: EDV Vault identifier.
-        keystore:
-          type: string
-          description: WebKMS keystore identifier.
+          type: object
+          properties:
+            uri:
+              type: string
+            zcap:
+              type: object
+        kms:
+          type: object
+          properties:
+            uri:
+              type: string
+            zcap:
+              type: object
     Document:
       type: object
-      required:
-        - content
       properties:
         id:
           type: string
@@ -116,11 +125,8 @@ components:
           type: array
           items:
             type: string
-        recipients:
-          description: An optional set of identifiers for recipient keys that can decrypt the document.
-          type: array
-          items:
-            type: string
+        edvDocURI:
+          type: string
     Authorization:
       description: An authorization.
       type: object
@@ -131,12 +137,24 @@ components:
         id:
           type: string
         scope:
-          type: array
-          items:
-            $ref: "#/components/schemas/Scope"
+          $ref: "#/components/schemas/Scope"
         requestingParty:
-          description: TODO keyIDs or opaque identifiers?
+          description: keyID
           type: string
+        edv:
+          type: object
+          properties:
+            url:
+              type: string
+            zcap:
+              type: object
+        kms:
+          type: object
+          properties:
+            url:
+              type: string
+            zcap:
+              type: object
     Scope:
       type: object
       required:

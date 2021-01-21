@@ -2,10 +2,16 @@
 
 actor "Account Holder" as user
 
-box Client Domains #LightBlue
-  participant "DHS svc 1" as d1
-  participant "DHS svc 2" as d2
-  participant Adapter as adp
+box Client Domain 1 #LightBlue
+  participant APP as d1
+  participant "Vault API" as vapi1
+  participant Comparator as comp1
+end box
+
+box Client Domain 2 #LightBlue
+  participant APP as d2
+  participant "Vault API" as vapi2
+  participant Comparator as comp2
 end box
 
 box Common Hosted Services #LightRed
@@ -17,98 +23,105 @@ box Common Hosted Services #LightRed
 end box
 
 group prior one-time setup
-  loop for each service
+  loop for each client domain
     gate -> gate : newOrgSecret()
     gate --> d1 : (out of band) orgSecret
-    d1 -> adp : init(orgSecret)
-    adp -> adp : newSvcKeyPair()
-    adp -> gate : createDID(key=svcKey, serviceEndpoint=..., authz=HMACSHA256(orgSecret))
+    d1 --> comp1 : init(orgSecret)
+    comp1 -> gate : POST /hubstore/acct authz=HMACSHA256(orgSecret)
+    gate -> edx : POST /hubstore/acct
+    edx -> gate : accountID, orgCompZCAP
+    gate -> comp1 : accountID, orgCompZCAP
+    d1 --> vapi1 : init(orgSecret)
+    vapi1 -> vapi1 : newSvcKeyPair()
+    vapi1 -> gate : createDID(key=svcKey, serviceEndpoint=..., authz=HMACSHA256(orgSecret))
     gate -> dlt : createDID(key=svcKey, serviceEndpoint=...)
     dlt -> gate : svcDID
-    gate -> adp : svcDID
-    adp -> d1 : svcDID
+    gate -> vapi1 : svcDID
+    vapi1 -> d1 : svcDID
   end
 end
 
-loop for each user registration at DHS service
+loop for each user registration at Client Domain
   user -> d1 : Registration w/SSN
-  d1 -> adp : newVault()
-  adp -> adp : newVaultID()
-  adp -> adp : newVaultPrimaryKey()
-  adp -> kms : createKeystore(controller=vaultPrimaryKey, authz=HMACSHA256(orgSecret))
-  kms -> adp : keystoreID, userKMSZCAP
-  adp -> edv : createDataVault(controller=vaultPrimaryKey, authz=HMACSHA256(orgSecret))
-  edv -> adp : edvVaultID, userEDVZCAP
-  adp -> d1 : vaultID
-  d1 -> adp : store(vault=vaultID, data=SSN)
-  adp -> adp : newCEK()
-  adp -> adp : encrypt(CEK, SSN)
-  adp -> kms : newKey(authz=HTTPSIG(userKMSZCAP))
-  kms -> adp : keyID
-  adp -> kms : wrap(CEK, keyID, authz=HTTPSIG(userKMSZCAP))
-  kms -> adp : wrappedCEK
-  adp -> adp : newEDVDocID()
-  adp -> adp : newEDVEncryptedDoc(docID, encryptedSSN, wrappedCEK)
-  adp -> edv : store(encryptedDoc, authz=HTTPSIG(userEDVZCAP))
-  edv -> adp : OK
-  note left
-    by now svc has associated to the user account:
-    userID, primaryKey, keystoreID, vaultID, EDV docID,
-    edvZCAP, kmsZCAP
-  end note
-  adp -> d1 : vaultID, edvDocID
+  d1 -> vapi1 : POST /vaults
+  vapi1 -> vapi1 : newVaultID()
+  vapi1 -> vapi1 : newVaultPrimaryKey()
+  vapi1 -> kms : POST /keystores {controller=vaultPrimaryKey} authz=HMACSHA256(orgSecret)
+  kms -> vapi1 : keystoreID, userKMSZCAP
+  vapi1 -> edv : POST /encrypted-data-vaults {controller=vaultPrimaryKey} authz=HMACSHA256(orgSecret)
+  edv -> vapi1 : edvVaultID, userEDVZCAP
+  vapi1 -> d1 : vaultID
+  note left: vaultserver vault created
+  d1 -> vapi1 : POST /vaults/{vaultID}/docs {content={SSN}}
+  vapi1 -> vapi1 : newCEK()
+  vapi1 -> vapi1 : encrypt(CEK, SSN)
+  vapi1 -> kms : POST /keystores/{keystoreID}/keys authz=HTTPSIG(userKMSZCAP)
+  kms -> vapi1 : keyID
+  vapi1 -> kms : POST /keystores/{keystoreID}/wrap {CEK, recipient=keyID} authz=HTTPSIG(userKMSZCAP)
+  kms -> vapi1 : wrappedCEK
+  vapi1 -> vapi1 : newEDVDocID()
+  vapi1 -> vapi1 : newEDVEncryptedDoc(docID, encryptedSSN, wrappedCEK)
+  vapi1 -> edv : POST /encrypted-data-vaults/{vaultID}/documents {encryptedDoc} authz=HTTPSIG(userEDVZCAP)
+  edv -> vapi1 : edvDocURI
+  vapi1 -> d1 : docID
+  note left: SSN encrypted and stored
 end
 
-group user links DHS service accounts
+group user links their account across client domains
   user -> d1 : Click "Link 'With' Account"
-  d1 -> user : NASCAR display with DHS services
-  user -> d1 : click on DHS service 2
+  d1 -> user : NASCAR display with Client Domains
+  user -> d1 : click on Client Domain 2
   d1 -> d2 : svc1DID#key
   note left: how is this call authenticated?
   d2 -> d2 : new short-lived code
-  d2 -> d1 : code, "http://svc2.gov/acct/link"
-  d1 -> user : link http://svc2.gov/acct/link?code=abc123
+  d2 -> d1 : code, "http://client2.com/acct/link"
+  d1 -> user : link http://client2.com/acct/link?code=abc123
   user -> d1 : click on link
   user --> d2 : (redirect) login
-  d2 -> adp : authorizeComparison(svc1DID#key, vaultID, edvDocID)
-  adp -> adp : hubEDVZCAP := newZCAP(parent=userEDVZCAP, invoker=hubPubDID, exp=60s)
-  adp -> adp : hubKMSZCAP := newZCAP(parent=userKMSZCAP, invoker=hubPubDID, exp=60s)
-  adp -> dlt : resolve(svc1DID, authz=HMACSHA256(orgSecret))
-  dlt -> adp : did:trustbloc:svc1
-  adp -> edx : newRef(authorize=did:trustbloc:svc1#key, QueryObject, hubEDVZCAP, hubKMSZCAP, authz=HMACSHA256(orgSecret))
-  edx -> adp : handle, challenge
-  adp -> d2 : handle, challenge
+  d2 -> comp2 : POST /authorizations {did:trustbloc:svc1, vaultID, docID, exp=5min}
+  comp2 -> dlt : resolve(svc1DID, authz=HMACSHA256(orgSecret))
+  dlt -> comp2 : did:trustbloc:svc1
+  comp2 -> vapi2 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}
+  vapi2 -> comp2 : hubEDVZCAP, hubKMSZCAP
+  comp2 -> vapi2 : GET /vaults/{vaultID}/docs/{docID}
+  vapi2 -> comp2 : edvDocURI
+  comp2 -> edx : POST /hubstore/acct/{accountID}/queries {edvDocURI, hubEDVZCAP, hubKMSZCAP} authz=HTTPSIG(orgCompZCAP)
+  edx -> comp2 : queryID
+  comp2 -> edx : POST /hubstore/acct/{accountID}/authorizations {queryID, did:trustbloc:svc1#key, scope="reference"} authz=HTTPSIG(orgCompZCAP)
+  note left
+    "reference" != "read". The requesting party will be allowed to reference
+    the query from another query, but won't be able to retrieve the query object
+    itself.
+  end note
+  edx -> comp2 : orgCompQueryZCAP
+  comp2 -> d2 : queryID, orgCompQueryZCAP
   d1 -> d2 : (polling) done?
-  d2 -> d1 : handle, challenge
-  note left: avoid disclosure of EDV doc IDs
-  d1 -> adp : compare(handle, challenge, userID, auth=did:trustbloc:svc1#key)
-  adp -> adp : hubEDVZCAP := newZCAP(parent=userEDVZCAP, invoker=adapterPubDID, exp=60s)
-  adp -> adp : hubKMSZCAP := newZCAP(parent=userKMSZCAP, invoker=adapterPubDID, exp=60s)
-  adp -> adp : newSignedJWT(did:trustbloc:svc1#key, challenge)
-  adp -> edx : compare(operator, handle, QueryObject, hubEDVZCAP, hubKMSZCAP, authz=[HMACSHA256(svcSecret), signedJWT(challenge)])
+  d2 -> d1 : queryID, orgCompQueryZCAP
+  d1 -> comp1 : POST /compare {vaultID, docID, queryID, orgCompQueryZCAP}
+  comp1 -> vapi1 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}
+  vapi1 -> comp1 : hubEDVZCAP, hubKMSZCAP
+  comp1 -> vapi1 : GET /vaults/{vaultID}/docs/{docID}
+  vapi1 -> comp1 : edvDocURI
+  comp1 -> edx : POST /disclose {edvDocURI, queryID, hubEDVZCAP, hubKMSZCAP} authz=HTTPSIG(orgCompZCAP)
   edx -> edx : array := newArray()
   loop for each query object
     alt if query object is ref
-      edx -> dlt : resolve(did:trustbloc:svc2)
-      dlt -> edx : DID doc
-      edx -> edx : verify(signedJWT(challenge), did:trustbloc:svc2#key)
       edx -> edx : lookup Query+Auth Objects by handle
-      edx -> edx : verify challenge matches the handle
-      edx -> edx : verify authorized DID URL key matches the handle
     end
     edx -> edv : readDoc(QueryObject, authz=HTTPSIG(hubEDVZCAP))
     edv -> edx : encryptedDoc
     edx -> kms : unwrap(wrappedCEK, authz=HTTPSIG(hubKMSZCAP))
     kms -> edx : unwrappedCEK
-    edx -> edx : let result = decrypt(encryptedDoc, unwrappedCEK)
+    edx -> edx : let doc = decrypt(encryptedDoc, unwrappedCEK)
     alt if query object has path
-      edx -> edx : result = select(jsonPath, decryptedDoc)
+      edx -> edx : doc = select(jsonPath, decryptedDoc)
     end
-    edx -> edx : append(array, result)
+    edx -> edx : append(array, doc)
   end
-  edx -> adp : eval(operator, array)
-  note left: boolean response
-  adp -> d1 : true or false
+  edx -> edx : let result = eval(operator, array)
+  note left: boolean
+  edx -> comp1 : result
+  comp1 -> d1 : result
 end
 
 @enduml

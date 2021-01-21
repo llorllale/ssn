@@ -1,0 +1,203 @@
+openapi: 3.0.0
+info:
+  title: Confidential Storage Hub
+  description: Confidential Storage Hub
+  version: 1.0.0
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+paths:
+  /hubstore/acct:
+    post:
+      description: Create new account.
+      responses:
+        201:
+          description: TODO
+          headers:
+            Location:
+              description: TODO
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+  /hubstore/acct/{accountID}/queries:
+    post:
+      description: TODO must exclude the 'Ref' query object
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Query"
+      responses:
+        201:
+          description: TODO
+          headers:
+            Location:
+              description: TODO
+              schema:
+                type: string
+  /hubstore/acct/{accountID}/authorizations:
+    post:
+      description: TODO
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                queryID:
+                  type: string
+                requestingParty:
+                  type: string
+      responses:
+        201:
+          description: TODO
+          headers:
+            Location:
+              description: TODO
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestingPartyAuthorization"
+  /hubstore/disclose:
+    post:
+      description: Evaluates an operator with its inputs and returns the result.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComparisonRequest"
+      responses:
+        200:
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonResult"
+components:
+  schemas:
+    Account:
+      description: TODO
+      type: object
+      properties:
+        id:
+          type: string
+        zcap:
+          type: object
+    ComparisonRequest:
+      description: TODO
+      type: object
+      properties:
+        op:
+          $ref: "#/components/schemas/Operator"
+    ComparisonResult:
+      description: TODO - "comparison" does not sound apt as a name
+      type: object
+      properties:
+        result:
+          type: boolean
+    Operator:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - eq
+    EqOp:
+      allOf:
+        - $ref: "#/components/schemas/Operator"
+        - type: object
+          required:
+            - args
+          properties:
+            args:
+              type: array
+              items:
+                $ref: "#/components/schemas/Query"
+              minItems: 2
+    Query:
+      type: object
+      required:
+        - type
+        - upstreamAuth
+      properties:
+        type:
+          type: string
+          enum:
+            - doc
+            - ref
+        upstreamAuth:
+          type: object
+          required:
+            - edv
+            - kms
+          properties:
+            edv:
+              $ref: "#/components/schemas/UpstreamAuthorization"
+            kms:
+              $ref: "#/components/schemas/UpstreamAuthorization"
+    DocQuery:
+      allOf:
+        - $ref: "#/components/schemas/Query"
+        - type: object
+          required:
+            - vaultID
+            - docID
+          properties:
+            vaultID:
+              type: string
+            docID:
+              type: string
+            path:
+              type: string
+    RefQuery:
+      allOf:
+        - $ref: "#/components/schemas/Query"
+        - type: object
+          required:
+            - ref
+          properties:
+            ref:
+              type: string
+    RequestingPartyAuthorization:
+      type: object
+      required:
+        - queryID
+        - requestingParty
+        - scope
+      properties:
+        id:
+          type: string
+        requestingParty:
+          type: string
+        scope:
+          type: object
+          required:
+            - queryID
+            - action
+          properties:
+            queryID:
+              type: string
+            action:
+              type: string
+              enum:
+                - read
+                - reference
+        zcap:
+          type: object
+    UpstreamAuthorization:
+      type: object
+      properties:
+        queryID:
+          type: string
+        baseURL:
+          type: string
+        zcap:
+          type: object
