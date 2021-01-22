@@ -16,7 +16,7 @@ end box
 
 box Common Hosted Services #LightRed
   participant Gateway as gate
-  participant "Trustbloc DID" as dlt
+  participant "did:orb" as dlt
   participant "Confidential Storage Hub" as edx
   participant EDV as edv
   participant WebKMS as kms
@@ -78,16 +78,16 @@ group user links their account across client domains
   d1 -> user : link http://client2.com/acct/link?code=abc123
   user -> d1 : click on link
   user --> d2 : (redirect) login
-  d2 -> comp2 : POST /authorizations {did:trustbloc:svc1, vaultID, docID, exp=5min}
+  d2 -> comp2 : POST /authorizations {did:orb:svc1, vaultID, docID, exp=5min}
   comp2 -> dlt : resolve(svc1DID, authz=HMACSHA256(orgSecret))
-  dlt -> comp2 : did:trustbloc:svc1
+  dlt -> comp2 : did:orb:svc1
   comp2 -> vapi2 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}
   vapi2 -> comp2 : hubEDVZCAP, hubKMSZCAP
   comp2 -> vapi2 : GET /vaults/{vaultID}/docs/{docID}
   vapi2 -> comp2 : edvDocURI
   comp2 -> edx : POST /hubstore/acct/{accountID}/queries {edvDocURI, hubEDVZCAP, hubKMSZCAP} authz=HTTPSIG(orgCompZCAP)
   edx -> comp2 : queryID
-  comp2 -> edx : POST /hubstore/acct/{accountID}/authorizations {queryID, did:trustbloc:svc1#key, scope="reference"} authz=HTTPSIG(orgCompZCAP)
+  comp2 -> edx : POST /hubstore/acct/{accountID}/authorizations {queryID, did:orb:svc1#key, scope="reference"} authz=HTTPSIG(orgCompZCAP)
   note left
     "reference" != "read". The requesting party will be allowed to reference
     the query from another query, but won't be able to retrieve the query object
