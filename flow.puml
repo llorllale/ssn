@@ -45,20 +45,9 @@ group prior one-time setup
     gate -> didvc : POST /register Headers:Origin=www.clientdomain1.com
     didvc -> dlt : createDID(key=svcKey, serviceEndpoint=...)
     dlt -> didvc : svcDID
-    didvc -> vcsvc : POST /{profileID}/credentials/composeAndIssueCredential {domain=www.clientdomain1.com, did=svcDID}
-    vcsvc -> vcsvc : didVC := newVC(domain=www.clientdomain1.com, did=svcDID)
-    vcsvc -> kms : sign(hash(vcsvc))
-    kms -> vcsvc : signature
-    vcsvc -> vcsvc : addProof(vc, signature)
-    vcsvc -> didvc : vc
-    didvc -> vcsvc : POST /store {vc}}
-    vcsvc -> vcsvc : newCEK()
-    vcsvc -> vcsvc : encrypt(CEK, didVC)
-    vcsvc -> kms : wrap(CEK)
-    kms -> vcsvc : wrappedCEK
-    vcsvc -> vcsvc : newEDVEncryptedDoc(wrappedCEK, encryptedDIDVC)
-    vcsvc -> edv : store(edvEncryptedDoc)
+    didvc -> vcsvc : POST /{profileID}/credentials/composeAndIssueCredential {www.clientdomain1.com, svcDID}
     vcsvc -> didvc : didVC
+    didvc -> vcsvc : POST /store {vc}}
     didvc -> gate : didVC
     gate -> proxy1 : didVC
     proxy1 -> memsvc1 : didVC
@@ -108,11 +97,6 @@ group user links their account across client domains
   d2 -> memsvc2 : queryMembership(didVC)
   memsvc2 -> didvc : queryMembership(didVC)
   didvc -> vcsvc : GET /status/{didVC.ID}
-  vcsvc -> edv : GET /encrypted-data-vaults/{vaultID}/documents/{docID}
-  edv -> vcsvc : edvEncryptedDoc
-  vcsvc -> kms : unwrap(wrappedCEK)
-  kms -> vcsvc : CEK
-  vcsvc -> vcsvc : decrypt(edvEncryptedDoc, CEK)
   vcsvc -> didvc : status
   didvc -> didvc : validate status
   didvc -> memsvc2 : did:orb:svc1, www.clientdomain1.com
