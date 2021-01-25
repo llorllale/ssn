@@ -21,7 +21,6 @@ end box
 box Common Hosted Services #LightRed
   participant Gateway as gate
   participant "Member Registry" as didvc
-  participant "vc-rest" as vcsvc
   participant "did:orb" as dlt
   participant "Confidential Storage Hub" as edx
   participant EDV as edv
@@ -45,9 +44,6 @@ group prior one-time setup
     gate -> didvc : POST /register Headers:Origin=www.clientdomain1.com
     didvc -> dlt : createDID(key=svcKey, serviceEndpoint=...)
     dlt -> didvc : svcDID
-    didvc -> vcsvc : POST /{profileID}/credentials/composeAndIssueCredential {www.clientdomain1.com, svcDID}
-    vcsvc -> didvc : didVC
-    didvc -> vcsvc : POST /store {vc}}
     didvc -> gate : didVC
     gate -> proxy1 : didVC
     proxy1 -> memsvc1 : didVC
@@ -96,9 +92,6 @@ group user links their account across client domains
   user -> d2 : consent to link accounts with SSN
   d2 -> memsvc2 : queryMembership(didVC)
   memsvc2 -> didvc : queryMembership(didVC)
-  didvc -> vcsvc : GET /status/{didVC.ID}
-  vcsvc -> didvc : status
-  didvc -> didvc : validate status
   didvc -> memsvc2 : did:orb:svc1, www.clientdomain1.com
   memsvc2 -> d2 : did:orb:svc1, www.clientdomain1.com
   d2 -> comp2 : POST /authorizations {did:orb:svc1, vaultID, docID, exp=5min}
