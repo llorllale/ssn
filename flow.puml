@@ -21,6 +21,7 @@ end box
 box Common Hosted Services #LightRed
   participant Gateway as gate
   participant "Member Registry" as didvc
+  participant "vc-rest" as vcsvc
   participant "did:orb" as dlt
   participant "Confidential Storage Hub" as edx
   participant EDV as edv
@@ -44,7 +45,18 @@ group prior one-time setup
     gate -> didvc : POST /register Headers:Origin=www.clientdomain1.com
     didvc -> dlt : createDID(key=svcKey, serviceEndpoint=...)
     dlt -> didvc : svcDID
-    didvc -> didvc : newVC(domain=www.clientdomain1.com, did=svcDID)
+    didvc -> vcsvc : POST /{profileID}/credentials/composeAndIssueCredential {domain=www.clientdomain1.com, did=svcDID}
+    vcsvc -> vcsvc : didVC := newVC(domain=www.clientdomain1.com, did=svcDID)
+    vcsvc -> kms : sign(hash(vcsvc))
+    kms -> vcsvc : signatrure
+    vcsvc -> vcsvc : addProof(vc, signature)
+    vcsvc -> vcsvc : newCEK()
+    vcsvc -> vcsvc : encrypt(CEK, didVC)
+    vcsvc -> kms : wrap(CEK)
+    kms -> vcsvc : wrappedCEK
+    vcsvc -> vcsvc : newEDVEncryptedDoc(wrappedCEK, encryptedDIDVC)
+    vcsvc -> edv : store(edvEncryptedDoc)
+    vcsvc -> didvc : didVC
     didvc -> gate : didVC
     gate -> proxy1 : didVC
     proxy1 -> memsvc1 : didVC
@@ -93,7 +105,14 @@ group user links their account across client domains
   user -> d2 : consent to link accounts with SSN
   d2 -> memsvc2 : queryMembership(didVC)
   memsvc2 -> didvc : queryMembership(didVC)
-  didvc -> didvc : checkStatus(didVC)
+  didvc -> vcsvc : GET /status/{didVC.ID}
+  vcsvc -> edv : GET /encrypted-data-vaults/{vaultID}/documents/{docID}
+  edv -> vcsvc : edvEncryptedDoc
+  vcsvc -> kms : unwrap(wrappedCEK)
+  kms -> vcsvc : CEK
+  vcsvc -> vcsvc : decrypt(edvEncryptedDoc, CEK)
+  vcsvc -> didvc : status
+  didvc -> didvc : validate status
   didvc -> memsvc2 : did:orb:svc1, www.clientdomain1.com
   memsvc2 -> d2 : did:orb:svc1, www.clientdomain1.com
   d2 -> comp2 : POST /authorizations {did:orb:svc1, vaultID, docID, exp=5min}
