@@ -6,16 +6,21 @@ box Client Domain 1 #LightBlue
   participant APP as d1
   participant "Vault API" as vapi1
   participant Comparator as comp1
+  participant "Membership Svc" as memsvc1
+  participant Proxy as proxy1
 end box
 
 box Client Domain 2 #LightBlue
   participant APP as d2
   participant "Vault API" as vapi2
   participant Comparator as comp2
+  participant "Membership Svc" as memsvc2
+  participant Proxy as proxy2
 end box
 
 box Common Hosted Services #LightRed
   participant Gateway as gate
+  participant "Member Registry" as didvc
   participant "did:orb" as dlt
   participant "Confidential Storage Hub" as edx
   participant EDV as edv
@@ -26,18 +31,23 @@ group prior one-time setup
   loop for each client domain
     gate -> gate : newOrgSecret()
     gate --> d1 : (out of band) orgSecret
-    d1 --> comp1 : init(orgSecret)
-    comp1 -> gate : POST /hubstore/acct authz=HMACSHA256(orgSecret)
+    d1 --> proxy1 : (out of band) configure(orgSecret)
+    comp1 -> proxy1: POST /hubstore/acct
+    proxy1 -> gate : POST /hubstore/acct authz=HMACSHA256(orgSecret)
     gate -> edx : POST /hubstore/acct
     edx -> gate : accountID, orgCompZCAP
-    gate -> comp1 : accountID, orgCompZCAP
-    d1 --> vapi1 : init(orgSecret)
-    vapi1 -> vapi1 : newSvcKeyPair()
-    vapi1 -> gate : createDID(key=svcKey, serviceEndpoint=..., authz=HMACSHA256(orgSecret))
-    gate -> dlt : createDID(key=svcKey, serviceEndpoint=...)
-    dlt -> gate : svcDID
-    gate -> vapi1 : svcDID
-    vapi1 -> d1 : svcDID
+    gate -> proxy1: accountID, orgCompZCAP
+    proxy1 -> comp1 : accountID, orgCompZCAP
+    memsvc1 -> memsvc1 : newSvcKeyPair()
+    memsvc1 -> proxy1 : register(key=svcKey)
+    proxy1 -> gate : register(key=svcKey, authz=HMACSHA256(orgSecret))
+    gate -> didvc : POST /register Headers:Origin=www.clientdomain1.com
+    didvc -> dlt : createDID(key=svcKey, serviceEndpoint=...)
+    dlt -> didvc : svcDID
+    didvc -> didvc : newVC(domain=www.clientdomain1.com, did=svcDID)
+    didvc -> gate : didVC
+    gate -> proxy1 : didVC
+    proxy1 -> memsvc1 : didVC
   end
 end
 
@@ -71,15 +81,23 @@ group user links their account across client domains
   user -> d1 : Click "Link 'With' Account"
   d1 -> user : NASCAR display with Client Domains
   user -> d1 : click on Client Domain 2
-  d1 -> d2 : svc1DID#key
-  note left: how is this call authenticated?
-  d2 -> d2 : new short-lived code
-  d2 -> d1 : code, "http://client2.com/acct/link"
-  d1 -> user : link http://client2.com/acct/link?code=abc123
-  user -> d1 : click on link
-  user --> d2 : (redirect) login
+  d1 -> memsvc1 : getMembership()
+  memsvc1 -> d1 : didVC
+  d1 --> d2 : GET /oauth2/authorize?request=OIDCRequestObject{client_id, scope, redirect_uri, didVC}
+  note left
+    * domain of redirect_uri MUST match the domain identified in didVC
+    * TODO custom request object
+  end note
+  note right: TODO scope?
+  user -> d2 : (optional) login
+  user -> d2 : consent to link accounts with SSN
+  d2 -> memsvc2 : queryMembership(didVC)
+  memsvc2 -> didvc : queryMembership(didVC)
+  didvc -> didvc : checkStatus(didVC)
+  didvc -> memsvc2 : did:orb:svc1, www.clientdomain1.com
+  memsvc2 -> d2 : did:orb:svc1, www.clientdomain1.com
   d2 -> comp2 : POST /authorizations {did:orb:svc1, vaultID, docID, exp=5min}
-  comp2 -> dlt : resolve(svc1DID, authz=HMACSHA256(orgSecret))
+  comp2 -> dlt : resolve(did:orb:sv1, authz=HMACSHA256(orgSecret))
   dlt -> comp2 : did:orb:svc1
   comp2 -> vapi2 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}
   vapi2 -> comp2 : hubEDVZCAP, hubKMSZCAP
@@ -95,9 +113,12 @@ group user links their account across client domains
   end note
   edx -> comp2 : orgCompQueryZCAP
   comp2 -> d2 : queryID, orgCompQueryZCAP
-  d1 -> d2 : (polling) done?
-  d2 -> d1 : queryID, orgCompQueryZCAP
-  d1 -> comp1 : POST /compare {vaultID, docID, queryID, orgCompQueryZCAP}
+  d2 --> d1 : (redirect) oauth2 authorization response with code
+  d1 -> d2 : oauth2 token request with code
+  d2 -> d1 : access_token(queryID, orgCompQueryZCAP)
+  note left: TODO access_token == orgCompQueryZCAP ?
+  d1 -> comp1 : POST /compare {vaultID, docID, orgCompQueryAP}
+  note left: TODO missing queryID parameter
   comp1 -> vapi1 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}
   vapi1 -> comp1 : hubEDVZCAP, hubKMSZCAP
   comp1 -> vapi1 : GET /vaults/{vaultID}/docs/{docID}
