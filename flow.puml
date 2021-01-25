@@ -48,8 +48,10 @@ group prior one-time setup
     didvc -> vcsvc : POST /{profileID}/credentials/composeAndIssueCredential {domain=www.clientdomain1.com, did=svcDID}
     vcsvc -> vcsvc : didVC := newVC(domain=www.clientdomain1.com, did=svcDID)
     vcsvc -> kms : sign(hash(vcsvc))
-    kms -> vcsvc : signatrure
+    kms -> vcsvc : signature
     vcsvc -> vcsvc : addProof(vc, signature)
+    vcsvc -> didvc : vc
+    didvc -> vcsvc : POST /store {vc}}
     vcsvc -> vcsvc : newCEK()
     vcsvc -> vcsvc : encrypt(CEK, didVC)
     vcsvc -> kms : wrap(CEK)
