@@ -110,11 +110,10 @@ group user links their account across client domains
     itself.
   end note
   edx -> comp2 : orgCompQueryZCAP
-  comp2 -> d2 : queryID, orgCompQueryZCAP
+  comp2 -> d2 : orgCompQueryZCAP
   d2 --> d1 : (redirect) oauth2 authorization response with code
   d1 -> d2 : oauth2 token request with code
-  d2 -> d1 : access_token(queryID, orgCompQueryZCAP)
-  note left: TODO access_token == orgCompQueryZCAP ?
+  d2 -> d1 : orgCompQueryZCAP
   d1 -> comp1 : POST /compare {vaultID, docID, orgCompQueryZCAP}
   note left: TODO missing queryID parameter
   comp1 -> vapi1 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}

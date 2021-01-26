@@ -1,0 +1,20 @@
+@startuml
+
+actor "Relying Party" as rp
+
+box "Authorization Server Domain"
+  actor "Authorization Server" as as
+  participant "Membership Svc" as memsvc
+  participant Comparator as comp
+end box
+
+rp -> as : GET /oauth2/authorize?client_id=123&_mem=base64url-encode(vc)
+as -> memsvc : POST /describe {vc}
+memsvc -> as : {did, domain}
+as -> comp : POST /accts/{accountID}/authorizations {did, vaultID, docID, exp=5min}
+comp -> as : access_token
+as -> rp : GET /oauth2/callback?code=xyz
+rp -> as : POST /oauth2/token {authorization_code=xyz}
+as -> rp : access_token
+
+@enduml

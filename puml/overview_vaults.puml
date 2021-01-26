@@ -1,0 +1,13 @@
+@startuml
+
+box "Client Domain"
+  actor Client as client
+  participant "Vault Server" as vaults
+end box
+
+client -> vaults : POST /vaults
+vaults -> client : vaultID
+client -> vaults : POST /vaults/{vaultID}/docs {my_document}
+vaults -> client : docID
+
+@enduml
