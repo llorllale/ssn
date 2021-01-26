@@ -80,7 +80,7 @@ group user links their account across client domains
   user -> d1 : Click "Link 'With' Account"
   d1 -> user : NASCAR display with Client Domains
   user -> d1 : click on Client Domain 2
-  d1 -> memsvc1 : getMembership()
+  d1 -> memsvc1 : GET /membership
   memsvc1 -> d1 : didVC
   d1 --> d2 : GET /oauth2/authorize?request=OIDCRequestObject{client_id, scope, redirect_uri, didVC}
   note left
@@ -90,7 +90,7 @@ group user links their account across client domains
   note right: TODO scope?
   user -> d2 : (optional) login
   user -> d2 : consent to link accounts with SSN
-  d2 -> memsvc2 : queryMembership(didVC)
+  d2 -> memsvc2 : POST /describe {didVC}
   memsvc2 -> didvc : queryMembership(didVC)
   didvc -> memsvc2 : did:orb:svc1, www.clientdomain1.com
   memsvc2 -> d2 : did:orb:svc1, www.clientdomain1.com
@@ -99,7 +99,7 @@ group user links their account across client domains
   dlt -> comp2 : did:orb:svc1
   comp2 -> vapi2 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}
   vapi2 -> comp2 : hubEDVZCAP, hubKMSZCAP
-  comp2 -> vapi2 : GET /vaults/{vaultID}/docs/{docID}
+  comp2 -> vapi2 : GET /vaults/{vaultID}/docs/{docID}/metadata
   vapi2 -> comp2 : edvDocURI
   comp2 -> edx : POST /hubstore/acct/{accountID}/queries {edvDocURI, hubEDVZCAP, hubKMSZCAP} authz=HTTPSIG(orgCompZCAP)
   edx -> comp2 : queryID
@@ -115,11 +115,11 @@ group user links their account across client domains
   d1 -> d2 : oauth2 token request with code
   d2 -> d1 : access_token(queryID, orgCompQueryZCAP)
   note left: TODO access_token == orgCompQueryZCAP ?
-  d1 -> comp1 : POST /compare {vaultID, docID, orgCompQueryAP}
+  d1 -> comp1 : POST /compare {vaultID, docID, orgCompQueryZCAP}
   note left: TODO missing queryID parameter
   comp1 -> vapi1 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}
   vapi1 -> comp1 : hubEDVZCAP, hubKMSZCAP
-  comp1 -> vapi1 : GET /vaults/{vaultID}/docs/{docID}
+  comp1 -> vapi1 : GET /vaults/{vaultID}/docs/{docID}/metadata
   vapi1 -> comp1 : edvDocURI
   comp1 -> edx : POST /disclose {edvDocURI, queryID, hubEDVZCAP, hubKMSZCAP} authz=HTTPSIG(orgCompZCAP)
   edx -> edx : array := newArray()

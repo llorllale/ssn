@@ -61,8 +61,8 @@ components:
     Scope:
       type: object
       required:
-        - target
-        - actions
+        - vaultID
+        - docID
       properties:
         vaultID:
           type: string

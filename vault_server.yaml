@@ -36,14 +36,14 @@ paths:
           description: Document encrypted and stored successfully.
           headers:
             Location:
-              description: Location of the document
+              description: Location of the document's metadata.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Document"
-  /vaults/{vaultID}/docs/{docID}:
+                $ref: "#/components/schemas/DocumentMetadata"
+  /vaults/{vaultID}/docs/{docID}/metadata:
     get:
       description: The plaintext document.
       responses:
@@ -52,7 +52,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: "#/components/schemas/DocumentMetadata"
   /vaults/{vaultID}/authorizations:
     post:
       description: Create an authorization.
@@ -115,16 +115,14 @@ components:
     Document:
       type: object
       properties:
-        id:
-          type: string
         content:
           description: The document to be encrypted and stored in the vault.
           type: object
-        tags:
-          description: An optional set of tags with which the document would be indexed.
-          type: array
-          items:
-            type: string
+    DocumentMetadata:
+      type: object
+      properties:
+        docID:
+          type: string
         edvDocURI:
           type: string
     Authorization:
