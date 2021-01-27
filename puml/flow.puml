@@ -1,12 +1,13 @@
 @startuml
 
+title Implementation Flow
+
 actor "Account Holder" as user
 
 box Client Domain 1 #LightBlue
   participant APP as d1
   participant "Vault API" as vapi1
   participant Comparator as comp1
-  participant "Membership Svc" as memsvc1
   participant Proxy as proxy1
 end box
 
@@ -14,13 +15,11 @@ box Client Domain 2 #LightBlue
   participant APP as d2
   participant "Vault API" as vapi2
   participant Comparator as comp2
-  participant "Membership Svc" as memsvc2
   participant Proxy as proxy2
 end box
 
 box Common Hosted Services #LightRed
   participant Gateway as gate
-  participant "Member Registry" as didvc
   participant "did:orb" as dlt
   participant "Confidential Storage Hub" as edx
   participant EDV as edv
@@ -32,47 +31,56 @@ group prior one-time setup
     gate -> gate : newOrgSecret()
     gate --> d1 : (out of band) orgSecret
     d1 --> proxy1 : (out of band) configure(orgSecret)
-    comp1 -> proxy1: POST /hubstore/acct
-    proxy1 -> gate : POST /hubstore/acct authz=HMACSHA256(orgSecret)
-    gate -> edx : POST /hubstore/acct
+    comp1 -> comp1 : newKeyPair()
+    comp1 -> proxy1 : createDID(pubKey)
+    proxy1 -> gate : createDID(pubKey) authz=HMACSHA256(orgSecret)
+    gate -> dlt : createDID(pubKey)
+    dlt -> gate : did:orb:svc
+    gate -> proxy1 : did:orb:svc
+    proxy1 -> comp1 : did:orb:svc
+    comp1 -> proxy1: POST /hubstore/acct {controller=did:orb:svc#key}
+    proxy1 -> gate : POST /hubstore/acct {controller=did:orb:svc#key} authz=HMACSHA256(orgSecret)
+    gate -> edx : POST /hubstore/acct {controller=did:orb:svc#key}
+    edx -> dlt : resolve(did:orb:svc)
+    dlt -> edx : did:orb:svc
     edx -> gate : accountID, orgCompZCAP
     gate -> proxy1: accountID, orgCompZCAP
     proxy1 -> comp1 : accountID, orgCompZCAP
-    memsvc1 -> memsvc1 : newSvcKeyPair()
-    memsvc1 -> proxy1 : register(key=svcKey)
-    proxy1 -> gate : register(key=svcKey, authz=HMACSHA256(orgSecret))
-    gate -> didvc : POST /register Headers:Origin=www.clientdomain1.com
-    didvc -> dlt : createDID(key=svcKey, serviceEndpoint=...)
-    dlt -> didvc : svcDID
-    didvc -> gate : didVC
-    gate -> proxy1 : didVC
-    proxy1 -> memsvc1 : didVC
+    d1 -> comp1 : getConfig()
+    comp1 -> d1 : did:orb:svc
+    d1 --> d2 : (oauth2 client registration) RFC7591 + did:orb:svc
   end
 end
 
 loop for each user registration at Client Domain
   user -> d1 : Registration w/SSN
   d1 -> vapi1 : POST /vaults
-  vapi1 -> vapi1 : newVaultID()
   vapi1 -> vapi1 : newVaultPrimaryKey()
-  vapi1 -> kms : POST /keystores {controller=vaultPrimaryKey} authz=HMACSHA256(orgSecret)
-  kms -> vapi1 : keystoreID, userKMSZCAP
-  vapi1 -> edv : POST /encrypted-data-vaults {controller=vaultPrimaryKey} authz=HMACSHA256(orgSecret)
-  edv -> vapi1 : edvVaultID, userEDVZCAP
-  vapi1 -> d1 : vaultID
-  note left: vaultserver vault created
-  d1 -> vapi1 : POST /vaults/{vaultID}/docs {content={SSN}}
+  vapi1 -> dlt : createDID(vaultPubKey) authz=HMACSHA256(orgSecret)
+  dlt -> vapi1 : did:orb:vault
+  vapi1 -> kms : POST /keystores {controller=did:orb:vault#key} authz=HMACSHA256(orgSecret)
+  kms -> vapi1 : keystoreID, vaultKMSZCAP
+  vapi1 -> edv : POST /encrypted-data-vaults {controller=did:orb:vault#key} authz=HMACSHA256(orgSecret)
+  edv -> vapi1 : edvVaultID, vaultEDVZCAP
+  vapi1 -> d1 : vaultID=did:orb:vault
+  note left: vault created as a UniversalWallet profile
+  d1 -> vapi1 : POST /vaults/{vaultDID}/docs {content={SSN}}
+  vapi1 -> vapi1 : newDocKey()
+  vapi1 -> dlt : createDID(docPubKey) authz=HMACSHA256(orgSecret)
+  dlt -> vapi1 : did:orb:ssn
+  vapi1 -> vapi1 : let vc = newVC(subj=did:orb:ssn, ssn=SSN)
+  note left: VC created using VC-HTTP-API
   vapi1 -> vapi1 : newCEK()
-  vapi1 -> vapi1 : encrypt(CEK, SSN)
-  vapi1 -> kms : POST /keystores/{keystoreID}/keys authz=HTTPSIG(userKMSZCAP)
+  vapi1 -> vapi1 : let encryptedVC = encrypt(CEK, vc)
+  vapi1 -> kms : POST /keystores/{keystoreID}/keys authz=HTTPSIG(vaultKMSZCAP)
   kms -> vapi1 : keyID
-  vapi1 -> kms : POST /keystores/{keystoreID}/wrap {CEK, recipient=keyID} authz=HTTPSIG(userKMSZCAP)
+  vapi1 -> kms : POST /keystores/{keystoreID}/wrap {CEK, recipient=keyID} authz=HTTPSIG(vaultKMSZCAP)
   kms -> vapi1 : wrappedCEK
   vapi1 -> vapi1 : newEDVDocID()
-  vapi1 -> vapi1 : newEDVEncryptedDoc(docID, encryptedSSN, wrappedCEK)
-  vapi1 -> edv : POST /encrypted-data-vaults/{vaultID}/documents {encryptedDoc} authz=HTTPSIG(userEDVZCAP)
+  vapi1 -> vapi1 : newEDVEncryptedDoc(docID, encryptedVC, wrappedCEK)
+  vapi1 -> edv : POST /encrypted-data-vaults/{vaultID}/documents {encryptedDoc} authz=HTTPSIG(vaultEDVZCAP)
   edv -> vapi1 : edvDocURI
-  vapi1 -> d1 : docID
+  vapi1 -> d1 : docID=did:orb:ssn
   note left: SSN encrypted and stored
 end
 
@@ -80,21 +88,11 @@ group user links their account across client domains
   user -> d1 : Click "Link 'With' Account"
   d1 -> user : NASCAR display with Client Domains
   user -> d1 : click on Client Domain 2
-  d1 -> memsvc1 : GET /membership
-  memsvc1 -> d1 : didVC
-  d1 --> d2 : GET /oauth2/authorize?request=OIDCRequestObject{client_id, scope, redirect_uri, didVC}
-  note left
-    * domain of redirect_uri MUST match the domain identified in didVC
-    * TODO custom request object
-  end note
-  note right: TODO scope?
+  d1 --> d2 : GET /oauth2/authorize?...
   user -> d2 : (optional) login
   user -> d2 : consent to link accounts with SSN
-  d2 -> memsvc2 : POST /describe {didVC}
-  memsvc2 -> didvc : queryMembership(didVC)
-  didvc -> memsvc2 : did:orb:svc1, www.clientdomain1.com
-  memsvc2 -> d2 : did:orb:svc1, www.clientdomain1.com
   d2 -> comp2 : POST /authorizations {did:orb:svc1, vaultID, docID, exp=5min}
+  note left: OAuth2 client registration included their public DID
   comp2 -> dlt : resolve(did:orb:sv1, authz=HMACSHA256(orgSecret))
   dlt -> comp2 : did:orb:svc1
   comp2 -> vapi2 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}
