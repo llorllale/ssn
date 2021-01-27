@@ -35,13 +35,13 @@ group prior one-time setup
     d1 --> proxy1 : (out of band) configure(orgSecret)
     comp1 -> comp1 : newKeyPair()
     comp1 -> proxy1 : createDID(pubKey)
-    proxy1 -> gate : createDID(pubKey) authz=HMACSHA256(orgSecret)
+    proxy1 -> gate : createDID(pubKey)
     gate -> dlt : createDID(pubKey)
     dlt -> gate : did:orb:svc
     gate -> proxy1 : did:orb:svc
     proxy1 -> comp1 : did:orb:svc
     comp1 -> proxy1: POST /hubstore/acct {controller=did:orb:svc#key}
-    proxy1 -> gate : POST /hubstore/acct {controller=did:orb:svc#key} authz=HMACSHA256(orgSecret)
+    proxy1 -> gate : POST /hubstore/acct {controller=did:orb:svc#key}
     gate -> edx : POST /hubstore/acct {controller=did:orb:svc#key}
     edx -> dlt : resolve(did:orb:svc)
     dlt -> edx : did:orb:svc
@@ -60,17 +60,17 @@ loop for each user registration at Client Domain
   user -> d1 : Registration w/SSN
   d1 -> vapi1 : POST /vaults
   vapi1 -> vapi1 : newVaultPrimaryKey()
-  vapi1 -> dlt : createDID(vaultPubKey) authz=HMACSHA256(orgSecret)
+  vapi1 -> dlt : createDID(vaultPubKey)
   dlt -> vapi1 : did:orb:vault
-  vapi1 -> kms : POST /keystores {controller=did:orb:vault#key} authz=HMACSHA256(orgSecret)
+  vapi1 -> kms : POST /keystores {controller=did:orb:vault#key}
   kms -> vapi1 : keystoreID, vaultKMSZCAP
-  vapi1 -> edv : POST /encrypted-data-vaults {controller=did:orb:vault#key} authz=HMACSHA256(orgSecret)
+  vapi1 -> edv : POST /encrypted-data-vaults {controller=did:orb:vault#key}
   edv -> vapi1 : edvVaultID, vaultEDVZCAP
   vapi1 -> d1 : vaultID=did:orb:vault
   note left: vault created as a UniversalWallet profile
   d1 -> vapi1 : POST /vaults/{vaultDID}/docs {content={SSN}}
   vapi1 -> vapi1 : newDocKey()
-  vapi1 -> dlt : createDID(docPubKey) authz=HMACSHA256(orgSecret)
+  vapi1 -> dlt : createDID(docPubKey)
   dlt -> vapi1 : did:orb:ssn
   vapi1 -> vcrest1 : createVC(subj=did:orb:ssn, ssn=SSN)
   vcrest1 -> vapi1 : vc
@@ -97,7 +97,7 @@ group user links their account across client domains
   user -> d2 : consent to link accounts with SSN
   d2 -> comp2 : POST /authorizations {did:orb:svc1, vaultID, docID, exp=5min}
   note left: OAuth2 client registration included their public DID
-  comp2 -> dlt : resolve(did:orb:sv1, authz=HMACSHA256(orgSecret))
+  comp2 -> dlt : resolve(did:orb:sv1)
   dlt -> comp2 : did:orb:svc1
   comp2 -> vapi2 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}
   vapi2 -> comp2 : hubEDVZCAP, hubKMSZCAP
