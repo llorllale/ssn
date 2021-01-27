@@ -46,7 +46,7 @@ group prior one-time setup
     edx -> dlt : resolve(did:orb:svc)
     dlt -> edx : did:orb:svc
     edx -> gate : accountID, orgCompZCAP
-    gate -> proxy1: accountID, orgCompZCAP
+    gate -> proxy1 : accountID, orgCompZCAP
     proxy1 -> comp1 : accountID, orgCompZCAP
     d1 -> comp1 : getConfig()
     comp1 -> d1 : did:orb:svc, orgKeyPair
@@ -93,17 +93,15 @@ group user links their account across client domains
   d1 --> d2 : GET /oauth2/authorize?...
   user -> d2 : (optional) login
   user -> d2 : consent to link accounts with SSN
-  d2 -> comp2 : POST /authorizations {did:orb:svc1, did:orb:vault, exp=5min}
+  d2 -> vapi2 : POST /vaults/{vaultID}/authorizations {rp=hubPubDID, scope=["read", did:orb:vault, exp=5min]}
+  vapi2 -> d2 : hubEDVZCAP, hubKMSZCAP
+  d2 -> comp2 : POST /authorizations {rp=did:orb:svc1, scope=["compare", did:orb:vault, exp=5min], authz=[hubEDVZCAP, hubKMSZCAP]}
   note left: OAuth2 client registration included their public DID
-  comp2 -> dlt : resolve(did:orb:sv1)
-  dlt -> comp2 : did:orb:svc1
-  comp2 -> vapi2 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", did:orb:vault, exp=5min]}
-  vapi2 -> comp2 : hubEDVZCAP, hubKMSZCAP
   comp2 -> vapi2 : GET /vaults/{vaultID}/docs/{docID}/metadata
   vapi2 -> comp2 : edvDocURI
   comp2 -> edx : POST /hubstore/acct/{accountID}/queries {edvDocURI, hubEDVZCAP, hubKMSZCAP} authz=HTTPSIG(orgCompZCAP)
   edx -> comp2 : queryID
-  comp2 -> edx : POST /hubstore/acct/{accountID}/authorizations {queryID, did:orb:svc1#key, scope="reference"} authz=HTTPSIG(orgCompZCAP)
+  comp2 -> edx : POST /hubstore/acct/{accountID}/authorizations {rp=did:orb:svc1, scope=[queryID, "reference", exp=5min]} authz=HTTPSIG(orgCompZCAP)
   note left
     "reference" != "read". The requesting party will be allowed to reference
     the query from another query, but won't be able to retrieve the query object
@@ -114,14 +112,14 @@ group user links their account across client domains
   d2 --> d1 : (redirect) oauth2 authorization response with code
   d1 -> d2 : oauth2 token request with code
   d2 -> d1 : orgCompQueryZCAP
-  d1 -> comp1 : POST /compare {vaultID, docID, orgCompQueryZCAP}
-  note left: TODO missing queryID parameter
-  comp1 -> vapi1 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", did:orb:vault, exp=5min]}
-  vapi1 -> comp1 : hubEDVZCAP, hubKMSZCAP
+  d1 -> vapi1 : POST /vaults/{vaultID}/authorizations {rp=hubPubDID, scope=["read", did:orb:vault, exp=5min]}
+  vapi1 -> d1 : hubEDVZCAP, hubKMSZCAP
+  d1 -> comp1 : /compare {doc1=[did:orb:vault, hubEDVZCAP, hubKMSZCAP], doc2=orgCompQueryZCAP
   comp1 -> vapi1 : GET /vaults/{vaultID}/docs/{docID}/metadata
   vapi1 -> comp1 : edvDocURI
-  comp1 -> edx : POST /disclose {edvDocURI, queryID, hubEDVZCAP, hubKMSZCAP} authz=HTTPSIG(orgCompZCAP)
-  edx -> edx : array := newArray()
+  comp1 -> edx : POST /compare {doc1=[edvDocURI, hubEDVZCAP, hubKMSZCAP], doc2=queryID} authz=HTTPSIG(orgCompQueryZCAP)
+  note left: comparator extracts queryID from orgCompQueryZCAP
+  edx -> edx : let array = newArray()
   loop for each query object
     alt if query object is ref
       edx -> edx : lookup Query+Auth Objects by handle
