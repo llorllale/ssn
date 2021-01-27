@@ -49,7 +49,7 @@ group prior one-time setup
     gate -> proxy1: accountID, orgCompZCAP
     proxy1 -> comp1 : accountID, orgCompZCAP
     d1 -> comp1 : getConfig()
-    comp1 -> d1 : did:orb:svc, keyPair
+    comp1 -> d1 : did:orb:svc, orgKeyPair
     d1 -> vcrest1 : createProfile(did:orb:svc, orgPrivKey)
     vcrest1 -> d1 : IssuerProfile
     d1 --> d2 : (oauth2 client registration) RFC7591 + did:orb:svc
@@ -66,26 +66,24 @@ loop for each user registration at Client Domain
   kms -> vapi1 : keystoreID, vaultKMSZCAP
   vapi1 -> edv : POST /encrypted-data-vaults {controller=did:orb:vault#key}
   edv -> vapi1 : edvVaultID, vaultEDVZCAP
-  vapi1 -> d1 : vaultID=did:orb:vault
-  note left: vault created as a UniversalWallet profile
-  d1 -> vapi1 : POST /vaults/{vaultDID}/docs {content={SSN}}
-  vapi1 -> vapi1 : newDocKey()
-  vapi1 -> dlt : createDID(docPubKey)
-  dlt -> vapi1 : did:orb:ssn
-  vapi1 -> vcrest1 : createVC(subj=did:orb:ssn, ssn=SSN)
-  vcrest1 -> vapi1 : vc
-  vapi1 -> vapi1 : newCEK()
+  vapi1 -> d1 : did:orb:vault
+  note left: vault created: UniversalWallet profile
+  d1 -> vcrest1 : POST /{id}/credentials/issueCredential {subj=did:orb:vault, ssn=abc123}
+  vcrest1 -> d1 : vc
+  note left: VC created containing SSN, with vaultDID as subject
+  d1 -> vapi1 : POST /vaults/{vaultDID}/docs {id=did:orb:vault, content=vc}
+  vapi1 -> vapi1 : let CEK = newCEK()
   vapi1 -> vapi1 : let encryptedVC = encrypt(CEK, vc)
   vapi1 -> kms : POST /keystores/{keystoreID}/keys authz=HTTPSIG(vaultKMSZCAP)
   kms -> vapi1 : keyID
   vapi1 -> kms : POST /keystores/{keystoreID}/wrap {CEK, recipient=keyID} authz=HTTPSIG(vaultKMSZCAP)
   kms -> vapi1 : wrappedCEK
-  vapi1 -> vapi1 : newEDVDocID()
-  vapi1 -> vapi1 : newEDVEncryptedDoc(docID, encryptedVC, wrappedCEK)
+  vapi1 -> vapi1 : newEDVEncryptedDoc(id=did:orb:vault, encryptedVC, wrappedCEK)
+  note left: TODO map did:orb into an EDV document ID
   vapi1 -> edv : POST /encrypted-data-vaults/{vaultID}/documents {encryptedDoc} authz=HTTPSIG(vaultEDVZCAP)
   edv -> vapi1 : edvDocURI
-  vapi1 -> d1 : docID=did:orb:ssn
-  note left: SSN encrypted and stored
+  vapi1 -> d1 : OK
+  note left: SSN VC encrypted and stored
 end
 
 group user links their account across client domains
@@ -95,11 +93,11 @@ group user links their account across client domains
   d1 --> d2 : GET /oauth2/authorize?...
   user -> d2 : (optional) login
   user -> d2 : consent to link accounts with SSN
-  d2 -> comp2 : POST /authorizations {did:orb:svc1, vaultID, docID, exp=5min}
+  d2 -> comp2 : POST /authorizations {did:orb:svc1, did:orb:vault, exp=5min}
   note left: OAuth2 client registration included their public DID
   comp2 -> dlt : resolve(did:orb:sv1)
   dlt -> comp2 : did:orb:svc1
-  comp2 -> vapi2 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}
+  comp2 -> vapi2 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", did:orb:vault, exp=5min]}
   vapi2 -> comp2 : hubEDVZCAP, hubKMSZCAP
   comp2 -> vapi2 : GET /vaults/{vaultID}/docs/{docID}/metadata
   vapi2 -> comp2 : edvDocURI
@@ -118,7 +116,7 @@ group user links their account across client domains
   d2 -> d1 : orgCompQueryZCAP
   d1 -> comp1 : POST /compare {vaultID, docID, orgCompQueryZCAP}
   note left: TODO missing queryID parameter
-  comp1 -> vapi1 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", vaultID, docID, exp=5min]}
+  comp1 -> vapi1 : POST /vaults/{vaultID}/authorizations {hubPubDID, scope=["read", did:orb:vault, exp=5min]}
   vapi1 -> comp1 : hubEDVZCAP, hubKMSZCAP
   comp1 -> vapi1 : GET /vaults/{vaultID}/docs/{docID}/metadata
   vapi1 -> comp1 : edvDocURI
