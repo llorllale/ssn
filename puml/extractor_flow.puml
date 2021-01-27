@@ -1,6 +1,6 @@
 @startuml
 
-title Comparison Flow
+title Payroll Flow
 
 actor "Account Holder" as user
 
@@ -86,45 +86,31 @@ loop for each user registration at Client Domain
   note left: SSN VC encrypted and stored
 end
 
-group user links their account across client domains
-  user -> d1 : Click "Link 'With' Account"
-  d1 -> user : NASCAR display with Client Domains
-  user -> d1 : click on Client Domain 2
-  d1 --> d2 : GET /oauth2/authorize?...
-  note left: TODO scope
-  user -> d2 : (optional) login
-  user -> d2 : consent to link accounts with SSN
-  d2 -> vapi2 : POST /vaults/{vaultID}/authorizations {rp=hubPubDID, scope=["read", did:orb:vault, exp=5min]}
-  vapi2 -> d2 : hubEDVZCAP, hubKMSZCAP
-  d2 -> comp2 : POST /authorizations {rp=did:orb:svc1, scope=["compare", did:orb:vault, exp=5min], authz=[hubEDVZCAP, hubKMSZCAP]}
-  note left: OAuth2 client registration included their public DID
-  comp2 -> vapi2 : GET /vaults/{vaultID}/docs/{docID}/metadata
-  vapi2 -> comp2 : edvDocURI
-  comp2 -> edx : POST /hubstore/acct/{accountID}/queries {edvDocURI, hubEDVZCAP, hubKMSZCAP} authz=HTTPSIG(orgCompZCAP)
-  edx -> comp2 : queryID
-  comp2 -> edx : POST /hubstore/acct/{accountID}/authorizations {rp=did:orb:svc1, scope=[queryID, "reference", exp=5min]} authz=HTTPSIG(orgCompZCAP)
-  note left
-    "reference" != "read". The requesting party will be allowed to reference
-    the query from another query, but won't be able to retrieve the query object
-    itself.
-  end note
-  edx -> comp2 : orgCompQueryZCAP
-  comp2 -> d2 : orgCompQueryZCAP
-  d2 --> d1 : (redirect) oauth2 authorization response with code
-  d1 -> d2 : oauth2 token request with code
-  d2 -> d1 : orgCompQueryZCAP
-  d1 -> vapi1 : POST /vaults/{vaultID}/authorizations {rp=hubPubDID, scope=["read", did:orb:vault, exp=5min]}
-  vapi1 -> d1 : hubEDVZCAP, hubKMSZCAP
-  d1 -> comp1 : /compare {doc1=[did:orb:vault, hubEDVZCAP, hubKMSZCAP], doc2=orgCompQueryZCAP
-  comp1 -> vapi1 : GET /vaults/{vaultID}/docs/{docID}/metadata
-  vapi1 -> comp1 : edvDocURI
-  comp1 -> edx : POST /compare {doc1=[edvDocURI, hubEDVZCAP, hubKMSZCAP], doc2=queryID}
-  note left: comparator extracts queryID from orgCompQueryZCAP
-  edx -> edx : let array = newArray()
-  loop for each query object
-    alt if query object is ref
-      edx -> edx : lookup Query+Auth Objects by handle
-    end
+group a client requests authorization to read another client's list of documents
+  d1 -> d2 : please send employee list who are eligible for payroll
+  d2 -> d2 : let authZList = newList()
+  loop for each did:orb:vault in d2
+    d2 -> vapi2 : POST /vaults/{vaultID}/authorizations {rp=hubPubDID, scope=["read", did:orb:vault, exp=5min]}
+    vapi2 -> d2 : hubEDVZCAP, hubKMSZCAP
+    d2 -> comp2 : POST /authorizations {rp=did:orb:svc1, scope=["read", did:orb:vault, exp=1day], authz=[hubEDVZCAP, hubKMSZCAP]}
+    note left: OAuth2 client registration included their public DID
+    comp2 -> vapi2 : GET /vaults/{vaultID}/docs/{docID}/metadata
+    vapi2 -> comp2 : edvDocURI
+    comp2 -> edx : POST /hubstore/acct/{accountID}/queries {edvDocURI, hubEDVZCAP, hubKMSZCAP} authz=HTTPSIG(orgCompZCAP)
+    edx -> comp2 : queryID
+    comp2 -> edx : POST /hubstore/acct/{accountID}/authorizations {rp=did:orb:svc1, scope=[queryID, "read", exp=1day]} authz=HTTPSIG(orgCompZCAP)
+    edx -> comp2 : orgCompQueryZCAP
+    comp2 -> d2 : orgCompQueryZCAP
+    d2 -> d2 : authZList.append(orgCompQueryZCAP)
+  end
+  d2 -> d1 : authZList
+  d1 -> comp1 : read(authZList)
+  comp1 -> comp1 : let docList = newList()
+  loop for each zcap in authZList
+    comp1 -> comp1 : let orgCompQueryZCAP = authZList.pop()
+    comp1 -> edx : GET /documents?ref=queryID authz=HTTPSIG(orgCompQueryZCAP)
+    note left: comparator extracts queryID from orgCompQueryZCAP
+    edx -> edx : lookup Query+Auth Objects by handle
     edx -> edv : readDoc(QueryObject, authz=HTTPSIG(hubEDVZCAP))
     edv -> edx : encryptedDoc
     edx -> kms : unwrap(wrappedCEK, authz=HTTPSIG(hubKMSZCAP))
@@ -133,12 +119,10 @@ group user links their account across client domains
     alt if query object has path
       edx -> edx : doc = select(jsonPath, decryptedDoc)
     end
-    edx -> edx : append(array, doc)
+    edx -> comp1 : doc
+    comp1 -> comp1 : docList.append(doc)
   end
-  edx -> edx : let result = eval(operator, array)
-  note left: boolean
-  edx -> comp1 : result
-  comp1 -> d1 : result
+  comp1 -> d1 : docList
 end
 
 @enduml
