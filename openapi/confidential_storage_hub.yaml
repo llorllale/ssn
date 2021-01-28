@@ -7,7 +7,7 @@ info:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
 paths:
-  /hubstore/acct:
+  /accts:
     post:
       description: Create new account.
       responses:
@@ -22,7 +22,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Account"
-  /hubstore/acct/{accountID}/queries:
+  /accts/{accountID}/queries:
     post:
       requestBody:
         content:
@@ -38,7 +38,7 @@ paths:
               description: TODO
               schema:
                 type: string
-  /hubstore/acct/{accountID}/authorizations:
+  /accts/{accountID}/authorizations:
     post:
       description: TODO
       requestBody:
@@ -63,7 +63,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RequestingPartyAuthorization"
-  /hubstore/disclose:
+  /compare:
     post:
       description: Evaluates an operator with its inputs and returns the result.
       requestBody:
@@ -79,6 +79,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ComparisonResult"
+  /extract:
+    post:
+      description: extracts the contents of a document. TODO - request schema
+      responses:
+        200:
+          description: The extracted and decrypted object.
+          content:
+            application/json:
+              schema:
+                type: object
 components:
   schemas:
     Account:
