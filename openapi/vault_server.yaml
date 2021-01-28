@@ -22,9 +22,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Vault"
+        500:
+          description: An error occurred.
+    delete:
+      description: Deletes an existing vault.
+      responses:
+        200:
+          description: Vault deleted.
+        404:
+          description: Vault does not exist.
   /vaults/{vaultID}/docs:
     post:
-      description: Encrypts and stores the document in the vault.
+      description: Create or update a document by encrypting it and storing it in the vault.
       requestBody:
         required: true
         content:
@@ -53,6 +62,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DocumentMetadata"
+        404:
+          description: Document not found.
   /vaults/{vaultID}/authorizations:
     post:
       description: Create an authorization.
@@ -84,11 +95,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Authorization"
+        404:
+          description: Authorization not found.
     delete:
       description: Delete an authorization.
       responses:
         200:
           description: Authorization deleted.
+        404:
+          description: Authorization not found.
 components:
   schemas:
     Vault:
@@ -114,7 +129,13 @@ components:
               type: string
     Document:
       type: object
+      required:
+        - id
+        - content
       properties:
+        id:
+          description: The identifier to associate with the document.
+          type: string
         content:
           description: The document to be encrypted and stored in the vault.
           type: object
