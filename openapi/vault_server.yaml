@@ -104,14 +104,14 @@ components:
             uri:
               type: string
             zcap:
-              type: object
+              type: string
         kms:
           type: object
           properties:
             uri:
               type: string
             zcap:
-              type: object
+              type: string
     Document:
       type: object
       properties:
@@ -145,14 +145,16 @@ components:
             url:
               type: string
             zcap:
-              type: object
+              description: a base64url-encoded zcap
+              type: string
         kms:
           type: object
           properties:
             url:
               type: string
             zcap:
-              type: object
+              description: a base64url-encoded zcap
+              type: string
     Scope:
       type: object
       required:

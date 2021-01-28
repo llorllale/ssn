@@ -12,10 +12,10 @@ paths:
       description: Create new account.
       responses:
         201:
-          description: TODO
+          description: Create a new account.
           headers:
             Location:
-              description: TODO
+              description: Location of the new Account.
               schema:
                 type: string
           content:
@@ -24,12 +24,12 @@ paths:
                 $ref: "#/components/schemas/Account"
   /hubstore/acct/{accountID}/queries:
     post:
-      description: TODO must exclude the 'Ref' query object
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/Query"
+              oneOf:
+                - $ref: "#/components/schemas/DocQuery"
       responses:
         201:
           description: TODO
@@ -200,4 +200,4 @@ components:
         baseURL:
           type: string
         zcap:
-          type: object
+          type: string
