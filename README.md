@@ -35,7 +35,6 @@ securely in them:
 
 Relying parties request authorization to perform a comparison of the contents two or more encrypted documents:
 
-- [Membership Svc: OpenAPI Spec](./openapi/mem_svc.yaml)
 - [Comparator: OpenAPI Spec](./openapi/comparator.yaml)
 
 ![overview_rp](./img/overview_rp.svg)
@@ -44,7 +43,6 @@ Relying parties request authorization to perform a comparison of the contents tw
 
 Authorization Servers generate an access_token from the Comparator:
 
-- [Membership Svc: OpenAPI Spec](./openapi/mem_svc.yaml)
 - [Comparator: OpenAPI Spec](./openapi/comparator.yaml)
 
 ![overview_as](./img/overview_as.svg)
