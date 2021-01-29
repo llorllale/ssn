@@ -5,9 +5,8 @@ box "Client Domain"
   participant "Vault Server" as vaults
 end box
 
-client -> vaults : POST /vaults
-vaults -> client : vaultID
-client -> vaults : POST /vaults/{vaultID}/docs {my_document}
-vaults -> client : docID
+client -> vaults : create vault
+vaults -> client : UniversalWallet profile
+client -> vaults : store document (docID, contents)
 
 @enduml

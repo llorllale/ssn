@@ -4,17 +4,16 @@ actor "Relying Party" as rp
 
 box "Authorization Server Domain"
   actor "Authorization Server" as as
-  participant "Membership Svc" as memsvc
+  participant "Vault API" as vapi
   participant Comparator as comp
 end box
 
-rp -> as : GET /oauth2/authorize?client_id=123&_mem=base64url-encode(vc)
-as -> memsvc : POST /describe {vc}
-memsvc -> as : {did, domain}
-as -> comp : POST /accts/{accountID}/authorizations {did, vaultID, docID, exp=5min}
+rp -> as : OAuth2 request
+as -> vapi : authorize comparator to read a document in a vault
+as -> comp: authorize relying party to perform a comparison
 comp -> as : access_token
-as -> rp : GET /oauth2/callback?code=xyz
-rp -> as : POST /oauth2/token {authorization_code=xyz}
+as -> rp : OAuth2 code
+rp -> as : code
 as -> rp : access_token
 
 @enduml

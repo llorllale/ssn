@@ -2,19 +2,19 @@
 
 box "Client Domain"
   actor "Relying Party" as rp
-  participant "Membership Svc" as memsvc
+  participant "Vault API" as vapi
   participant Comparator as comp
 end box
 
 actor "Authorization Server" as as
 
-rp -> memsvc : GET /membership
-memsvc -> rp : membership VC
-rp -> as : GET /oauth2/authorize?client_id=123&_mem=base64url-encode(vc)
-as -> rp : GET /oauth2/callback?code=xyz
-rp -> as : POST /oauth2/token {authorization_code=xyz}
-as -> rp : access_token
-rp -> comp : POST /compare {vaultID, docID, access_token}
-comp -> rp : true or false
+rp -> as : OAuth2 request
+as -> rp : OAuth2 code
+rp -> as : code
+as -> rp : access_token_as
+rp -> vapi : authorize comparator to read a document in a vault
+vapi -> rp : access_token_rp
+rp -> comp : do comparison (access_token_as, access_token_rp)
+comp -> rp : comparison result (true or false)
 
 @enduml
