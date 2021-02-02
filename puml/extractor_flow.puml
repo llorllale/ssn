@@ -108,7 +108,7 @@ group a client requests authorization to read another client's list of documents
   comp1 -> comp1 : let docList = newList()
   loop for each zcap in authZList
     comp1 -> comp1 : let orgCompQueryZCAP = authZList.pop()
-    comp1 -> edx : GET /documents?ref=queryID authz=HTTPSIG(orgCompQueryZCAP)
+    comp1 -> edx : GET /extract?resource=queryID authz=HTTPSIG(orgCompQueryZCAP)
     note left: comparator extracts queryID from orgCompQueryZCAP
     edx -> edx : lookup Query+Auth Objects by handle
     edx -> edv : readDoc(QueryObject, authz=HTTPSIG(hubEDVZCAP))
