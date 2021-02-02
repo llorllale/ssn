@@ -24,6 +24,10 @@ paths:
                 $ref: "#/components/schemas/Vault"
         500:
           description: An error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     delete:
       description: Deletes an existing vault.
       responses:
@@ -31,7 +35,22 @@ paths:
           description: Vault deleted.
         404:
           description: Vault does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: An error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /vaults/{vaultID}/docs:
+    parameters:
+      - in: path
+        name: vaultID
+        schema:
+          type: string
     post:
       description: Create or update a document by encrypting it and storing it in the vault.
       requestBody:
@@ -52,9 +71,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DocumentMetadata"
+        400:
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: Vault not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: An error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /vaults/{vaultID}/docs/{docID}/metadata:
+    parameters:
+      - in: path
+        name: vaultID
+        schema:
+          type: string
+      - in: path
+        name: docID
+        schema:
+          type: string
     get:
-      description: The plaintext document.
+      description: Metadata about a stored document.
       responses:
         200:
           description: The plaintext document.
@@ -63,8 +109,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/DocumentMetadata"
         404:
-          description: Document not found.
+          description: Vault or document not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        500:
+          description: An error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /vaults/{vaultID}/authorizations:
+    parameters:
+      - in: path
+        name: vaultID
+        schema:
+          type: string
     post:
       description: Create an authorization.
       requestBody:
@@ -85,7 +146,28 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Authorization"
+        400:
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        404:
+          description: Vault not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /vaults/{vaultID}/authorizations/{authorizationID}:
+    parameters:
+      - in: path
+        name: vaultID
+        schema:
+          type: string
+      - in: path
+        name: authorizationID
+        schema:
+          type: string
     get:
       description: Fetch an authorization.
       responses:
@@ -96,19 +178,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/Authorization"
         404:
-          description: Authorization not found.
+          description: Vault or authorization not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     delete:
       description: Delete an authorization.
       responses:
         200:
           description: Authorization deleted.
         404:
-          description: Authorization not found.
+          description: Vault or authorization not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   schemas:
     Vault:
       type: object
       required:
+        - id
+        - edv
+        - kms
       properties:
         id:
           type: string
@@ -141,6 +234,9 @@ components:
           type: object
     DocumentMetadata:
       type: object
+      required:
+        - docID
+        - edvDocURI
       properties:
         docID:
           type: string
@@ -209,3 +305,8 @@ components:
             duration:
               type: integer
               description: Duration (in seconds) for which this authorization will remain valid.
+    Error:
+      type: object
+      properties:
+        errMessage:
+          type: string
