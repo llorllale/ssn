@@ -9,6 +9,8 @@ info:
 paths:
   /vaults:
     post:
+      tags:
+        - required
       description: Creates a new vault.
       responses:
         201:
@@ -22,6 +24,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Vault"
+              example: {
+                "id": "did:example:123",
+                "edv": {
+                  "uri": "https://edv.example.com/encrypted-data-vaults/123/documents/456",
+                  "authToken": "123456789abcdefghi"
+                },
+                "kms": {
+                  "uri": "https://kms.example.com/keystores/123/keys/456",
+                  "authToken": "v6gmMNam3uVAjZpfkcJCwD"
+                }
+              }
         500:
           description: An error occurred.
           content:
@@ -53,6 +66,8 @@ paths:
         schema:
           type: string
     post:
+      tags:
+        - required
       description: Create or update a document by encrypting it and storing it in the vault.
       requestBody:
         required: true
@@ -137,6 +152,8 @@ paths:
           type: string
         required: true
     post:
+      tags:
+        - required
       description: Create an authorization.
       requestBody:
         required: true
