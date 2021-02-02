@@ -30,8 +30,7 @@ paths:
                     }
                   ],
                 }
-              ],
-              "authToken": "21tDAKCERh95uGgKbJNHYp"
+              ]
             }
       responses:
         200:
@@ -58,10 +57,7 @@ paths:
                         "duration": 600
                       }
                     ],
-                    "authTokens": {
-                      "edv": "21tDAKCERh95uGgKbJNHYp",
-                      "kms": "bcehfew7h32f32h7af3"
-                    }
+                    "authToken": "21tDAKCERh95uGgKbJNHYp"
                   }
                 ]
               }
